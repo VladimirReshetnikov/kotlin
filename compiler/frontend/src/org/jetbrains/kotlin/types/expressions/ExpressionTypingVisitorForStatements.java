@@ -141,7 +141,7 @@ public class ExpressionTypingVisitorForStatements extends ExpressionTypingVisito
             dataFlowInfo = typeInfo.getDataFlowInfo();
             JetType type = typeInfo.getType();
             if (property.getTypeReference() == null && type != null) {
-                DataFlowValue variableDataFlowValue = DataFlowValueFactory.createDataFlowValue(propertyDescriptor);
+                DataFlowValue variableDataFlowValue = DataFlowValueFactory.createDataFlowValue(propertyDescriptor, scope);
                 DataFlowValue initializerDataFlowValue = DataFlowValueFactory.createDataFlowValue(initializer, type, context.trace.getBindingContext());
                 dataFlowInfo = dataFlowInfo.equate(variableDataFlowValue, initializerDataFlowValue);
             }

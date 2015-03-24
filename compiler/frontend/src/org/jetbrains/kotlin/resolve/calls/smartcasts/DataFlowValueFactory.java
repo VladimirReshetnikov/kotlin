@@ -17,6 +17,7 @@
 package org.jetbrains.kotlin.resolve.calls.smartcasts;
 
 import com.intellij.openapi.util.Pair;
+import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.JetNodeTypes;
@@ -26,10 +27,12 @@ import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.resolve.BindingContext;
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilPackage;
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall;
+import org.jetbrains.kotlin.resolve.scopes.WritableScope;
 import org.jetbrains.kotlin.resolve.scopes.receivers.*;
 import org.jetbrains.kotlin.types.JetType;
 import org.jetbrains.kotlin.types.TypeUtils;
 
+import static org.jetbrains.kotlin.resolve.BindingContext.FILE_TO_PACKAGE_FRAGMENT;
 import static org.jetbrains.kotlin.resolve.BindingContext.REFERENCE_TARGET;
 
 public class DataFlowValueFactory {
@@ -80,9 +83,24 @@ public class DataFlowValueFactory {
     }
 
     @NotNull
-    public static DataFlowValue createDataFlowValue(@NotNull VariableDescriptor variableDescriptor) {
+    public static DataFlowValue createDataFlowValue(@NotNull VariableDescriptor variableDescriptor, @NotNull WritableScope scope) {
+        return createDataFlowValue(variableDescriptor, getContainingPackage(scope.getContainingDeclaration()));
+    }
+
+    /**
+     * Creates a data flow value for a variable with a given variable descriptor at a given place of usage.
+     *
+     * @param variableDescriptor descriptor of a considered variable
+     * @param usageContainingPackage a package of a considered variable usage
+     * @return data flow value for a given variable at a given place of usage
+     */
+    @NotNull
+    public static DataFlowValue createDataFlowValue(@NotNull VariableDescriptor variableDescriptor,
+            @Nullable PackageFragmentDescriptor usageContainingPackage) {
         JetType type = variableDescriptor.getType();
-        return new DataFlowValue(variableDescriptor, type, isStableVariable(variableDescriptor), getImmanentNullability(type));
+        return new DataFlowValue(variableDescriptor, type,
+                                 isStableVariable(variableDescriptor, usageContainingPackage),
+                                 getImmanentNullability(type));
     }
 
     @NotNull
@@ -173,6 +191,10 @@ public class DataFlowValueFactory {
         DeclarationDescriptor declarationDescriptor = bindingContext.get(REFERENCE_TARGET, simpleNameExpression);
         if (declarationDescriptor instanceof VariableDescriptor) {
             ResolvedCall<?> resolvedCall = CallUtilPackage.getResolvedCall(simpleNameExpression, bindingContext);
+            // We cannot call .getContainingJetFile because it can throw assertion error
+            PsiFile psiFile = simpleNameExpression.getContainingFile();
+            PackageFragmentDescriptor usagePackageDescriptor = psiFile instanceof JetFile ?
+                                                               bindingContext.get(FILE_TO_PACKAGE_FRAGMENT, (JetFile)psiFile) : null;
             // todo uncomment assert
             // KT-4113
             // for now it fails for resolving 'invoke' convention, return it after 'invoke' algorithm changes
@@ -182,7 +204,9 @@ public class DataFlowValueFactory {
                     resolvedCall != null ? getIdForImplicitReceiver(resolvedCall.getDispatchReceiver(), simpleNameExpression) : null;
 
             VariableDescriptor variableDescriptor = (VariableDescriptor) declarationDescriptor;
-            return combineInfo(receiverInfo, createInfo(variableDescriptor, isStableVariable(variableDescriptor)));
+            return combineInfo(receiverInfo, createInfo(variableDescriptor,
+                                                        // FIXME: Here we should have *usage* containing module
+                                                        isStableVariable(variableDescriptor, usagePackageDescriptor)));
         }
         if (declarationDescriptor instanceof PackageViewDescriptor) {
             return createPackageInfo(declarationDescriptor);
@@ -216,15 +240,50 @@ public class DataFlowValueFactory {
         return NO_IDENTIFIER_INFO;
     }
 
-    public static boolean isStableVariable(@NotNull VariableDescriptor variableDescriptor) {
+    /**
+     * Determines whether a variable with a given descriptor is stable or not at the given usage place.
+     *
+     * Stable means that the variable value cannot change. The simple (non-property) variable is considered stable if it's immutable (val).
+     *
+     * If the variable is a property, it's considered stable if it's immutable (val) AND it's final (not open) AND
+     * the default getter is in use (otherwise nobody can guarantee that a getter is consistent) AND
+     * (it's private OR internal OR used at the same package where it's defined).
+     * The last check corresponds to a risk of changing property definition in another package, e.g. from "val" to "var".
+     *
+     * @param variableDescriptor descriptor of a considered variable
+     * @param usageContainingPackage a package with a considered usage place, or null if it's not known (not recommended)
+     * @return true if variable is stable, false otherwise
+     */
+    public static boolean isStableVariable(@NotNull VariableDescriptor variableDescriptor,
+            @Nullable PackageFragmentDescriptor usageContainingPackage) {
         if (variableDescriptor.isVar()) return false;
         if (variableDescriptor instanceof PropertyDescriptor) {
             PropertyDescriptor propertyDescriptor = (PropertyDescriptor) variableDescriptor;
-            if (!invisibleFromOtherModules(propertyDescriptor)) return false;
+            // This and next checks are true
             if (!isFinal(propertyDescriptor)) return false;
             if (!hasDefaultGetter(propertyDescriptor)) return false;
+            // Suspicious
+            if (!invisibleFromOtherModules(propertyDescriptor)) {
+                // KT-4450
+                // We want to return true if all of the following is true:
+                // * val property is final (checked above)
+                // * val property has default getter and thus also a backing field (checked above)
+                // * val is used in the same module when defined (checked below)
+                // (otherwise module with definition can change other property characteristics silently)
+                PackageFragmentDescriptor declarationContainingPackage = getContainingPackage(propertyDescriptor);
+                if (usageContainingPackage == null || !usageContainingPackage.equals(declarationContainingPackage))
+                    return false;
+            }
         }
         return true;
+    }
+
+    private static @Nullable PackageFragmentDescriptor getContainingPackage(@Nullable DeclarationDescriptor declarationDescriptor) {
+        if (declarationDescriptor == null)
+            return null;
+        if (declarationDescriptor instanceof PackageFragmentDescriptor)
+            return (PackageFragmentDescriptor)declarationDescriptor;
+        return getContainingPackage(declarationDescriptor.getContainingDeclaration());
     }
 
     private static boolean isFinal(PropertyDescriptor propertyDescriptor) {
