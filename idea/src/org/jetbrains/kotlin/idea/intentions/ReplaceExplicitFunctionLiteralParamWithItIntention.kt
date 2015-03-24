@@ -29,6 +29,7 @@ import com.intellij.psi.codeStyle.CodeStyleManager
 import org.jetbrains.kotlin.descriptors.impl.AnonymousFunctionDescriptor
 import org.jetbrains.kotlin.idea.references.JetReference
 import org.jetbrains.kotlin.descriptors.VariableDescriptor
+import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 
 public class ReplaceExplicitFunctionLiteralParamWithItIntention() : PsiElementBaseIntentionAction() {
@@ -73,7 +74,7 @@ public class ReplaceExplicitFunctionLiteralParamWithItIntention() : PsiElementBa
             }
             is JetSimpleNameExpression -> {
                 val reference = expression.getReference() as JetReference?
-                val variableDescriptor = reference?.resolveToDescriptors()?.firstOrNull() as? VariableDescriptor?
+                val variableDescriptor = reference?.resolveToDescriptors(expression.analyze())?.firstOrNull() as? VariableDescriptor?
                 if (variableDescriptor != null) {
                     val containingDescriptor = variableDescriptor.getContainingDeclaration()
                     if (containingDescriptor is AnonymousFunctionDescriptor) {

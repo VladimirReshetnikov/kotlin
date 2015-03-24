@@ -72,7 +72,7 @@ abstract class CompletionSessionBase(protected val configuration: CompletionSess
     protected val reference: JetSimpleNameReference?
     protected val expression: JetExpression?
 
-    ;{
+    init {
         val reference = position.getParent()?.getReferences()?.firstIsInstanceOrNull<JetSimpleNameReference>()
         if (reference != null) {
             if (reference.expression is JetLabelReferenceExpression) {
@@ -90,9 +90,8 @@ abstract class CompletionSessionBase(protected val configuration: CompletionSess
         }
     }
 
-    protected val bindingContext: BindingContext? = expression?.let { resolutionFacade.analyze(it, BodyResolveMode.PARTIAL_FOR_COMPLETION) }
-    protected val inDescriptor: DeclarationDescriptor? = expression?.let { bindingContext!!.get(BindingContext.RESOLUTION_SCOPE, it)?.getContainingDeclaration() }
-
+    protected val bindingContext: BindingContext = resolutionFacade.analyze(position.getParent() as JetElement, BodyResolveMode.PARTIAL_FOR_COMPLETION)
+    protected val inDescriptor: DeclarationDescriptor? = expression?.let { bindingContext.get(BindingContext.RESOLUTION_SCOPE, it)?.getContainingDeclaration() }
 
     private fun singleCharPattern(char: Char): CharPattern {
         return StandardPatterns.character().with(
@@ -104,7 +103,7 @@ abstract class CompletionSessionBase(protected val configuration: CompletionSess
     private val kotlinIdentifierStartPattern: ElementPattern<Char>
     private val kotlinIdentifierPartPattern: ElementPattern<Char>
 
-    ;{
+    init {
         val includeDollar = position.prevLeaf()?.getNode()?.getElementType() != JetTokens.SHORT_TEMPLATE_ENTRY_START
         if (includeDollar) {
             kotlinIdentifierStartPattern = StandardPatterns.character().javaIdentifierStart()
@@ -128,14 +127,13 @@ abstract class CompletionSessionBase(protected val configuration: CompletionSess
 
     protected val prefixMatcher: PrefixMatcher = this.resultSet.getPrefixMatcher()
 
-    protected val referenceVariantsHelper: ReferenceVariantsHelper?
-            = if (bindingContext != null) ReferenceVariantsHelper(bindingContext) { isVisibleDescriptor(it) } else null
+    protected val referenceVariantsHelper: ReferenceVariantsHelper = ReferenceVariantsHelper(bindingContext) { isVisibleDescriptor(it) }
 
     protected val lookupElementFactory: LookupElementFactory = run {
         val receiverTypes = if (reference != null) {
             val expression = reference.expression
-            val (receivers, callType) = referenceVariantsHelper!!.getReferenceVariantsReceivers(expression)
-            val dataFlowInfo = bindingContext!!.getDataFlowInfo(expression)
+            val (receivers, callType) = referenceVariantsHelper.getReferenceVariantsReceivers(expression)
+            val dataFlowInfo = bindingContext.getDataFlowInfo(expression)
             var receiverTypes = receivers.flatMap {
                 SmartCastUtils.getSmartCastVariantsWithLessSpecificExcluded(it, bindingContext, dataFlowInfo)
             }
@@ -163,7 +161,7 @@ abstract class CompletionSessionBase(protected val configuration: CompletionSess
     }
 
     protected val indicesHelper: KotlinIndicesHelper
-        get() = KotlinIndicesHelper(project, resolutionFacade, bindingContext!!, searchScope, moduleDescriptor) { isVisibleDescriptor(it) }
+        get() = KotlinIndicesHelper(project, resolutionFacade, bindingContext, searchScope, moduleDescriptor) { isVisibleDescriptor(it) }
 
     protected fun isVisibleDescriptor(descriptor: DeclarationDescriptor): Boolean {
         if (configuration.completeNonAccessibleDeclarations) return true
@@ -191,7 +189,7 @@ abstract class CompletionSessionBase(protected val configuration: CompletionSess
     private var alreadyAddedDescriptors: Collection<DeclarationDescriptor> by Delegates.notNull()
 
     protected fun getReferenceVariants(kindFilter: DescriptorKindFilter, runtimeReceiverType: Boolean): Collection<DeclarationDescriptor> {
-        val descriptors = referenceVariantsHelper!!.getReferenceVariants(reference!!.expression, kindFilter, runtimeReceiverType, prefixMatcher.asNameFilter())
+        val descriptors = referenceVariantsHelper.getReferenceVariants(reference!!.expression, kindFilter, runtimeReceiverType, prefixMatcher.asNameFilter())
         if (!runtimeReceiverType) {
             if (position.getContainingFile() is JetCodeFragment) {
                 alreadyAddedDescriptors = descriptors
@@ -226,7 +224,7 @@ abstract class CompletionSessionBase(protected val configuration: CompletionSess
 
     protected fun addAllClasses(kindFilter: (ClassKind) -> Boolean) {
         AllClassesCompletion(
-                parameters, lookupElementFactory, resolutionFacade, bindingContext!!, moduleDescriptor,
+                parameters, lookupElementFactory, resolutionFacade, bindingContext, moduleDescriptor,
                 searchScope, prefixMatcher, kindFilter, { isVisibleDescriptor(it) }
         ).collect(collector)
     }
@@ -308,7 +306,7 @@ class BasicCompletionSession(configuration: CompletionSessionConfiguration,
                     // if "this" is parsed correctly in the current context - insert it and all this@xxx items
                     "this" -> {
                         if (expression != null) {
-                            collector.addElements(thisExpressionItems(bindingContext!!, expression, prefix).map { it.factory() })
+                            collector.addElements(thisExpressionItems(bindingContext, expression, prefix).map { it.factory() })
                         }
                         else {
                             // for completion in secondary constructor delegation call
@@ -319,7 +317,7 @@ class BasicCompletionSession(configuration: CompletionSessionConfiguration,
                     // if "return" is parsed correctly in the current context - insert it and all return@xxx items
                     "return" -> {
                         if (expression != null) {
-                            collector.addElements(returnExpressionItems(bindingContext!!, expression))
+                            collector.addElements(returnExpressionItems(bindingContext, expression))
                         }
                     }
 
@@ -348,7 +346,7 @@ class BasicCompletionSession(configuration: CompletionSessionConfiguration,
             }
         }
 
-        NamedParametersCompletion.complete(position, collector)
+        NamedParametersCompletion.complete(position, collector, bindingContext)
     }
 
     private object NonAnnotationClassifierExclude : DescriptorKindExclude {
@@ -397,7 +395,7 @@ class SmartCompletionSession(configuration: CompletionSessionConfiguration, para
         if (expression != null) {
             val mapper = ToFromOriginalFileMapper(parameters.getOriginalFile() as JetFile, position.getContainingFile() as JetFile, parameters.getOffset())
             val completion = SmartCompletion(expression, resolutionFacade, moduleDescriptor,
-                                             bindingContext!!, { isVisibleDescriptor(it) }, inDescriptor, prefixMatcher, originalSearchScope,
+                                             bindingContext, { isVisibleDescriptor(it) }, inDescriptor, prefixMatcher, originalSearchScope,
                                              mapper, lookupElementFactory)
             val result = completion.execute()
             if (result != null) {

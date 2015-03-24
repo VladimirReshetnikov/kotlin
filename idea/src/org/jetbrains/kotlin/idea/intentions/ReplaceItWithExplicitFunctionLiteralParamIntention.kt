@@ -39,7 +39,7 @@ public class ReplaceItWithExplicitFunctionLiteralParamIntention() : PsiElementBa
         val simpleNameExpression = element.getStrictParentOfType<JetSimpleNameExpression>()!!
 
         val simpleNameReference = simpleNameExpression.getReference() as JetReference?
-        val target = simpleNameReference?.resolveToDescriptors()?.first()!!
+        val target = simpleNameReference?.resolveToDescriptors(simpleNameExpression.analyze())?.first()!!
 
         val funcExpr = DescriptorToSourceUtils.descriptorToDeclaration(target.getContainingDeclaration()!!) as JetFunctionLiteral
 
@@ -76,7 +76,7 @@ public class ReplaceItWithExplicitFunctionLiteralParamIntention() : PsiElementBa
 
             val bindingContext = simpleNameExpression.analyze()
             val reference = simpleNameExpression.getReference() as JetReference?
-            val simpleNameTarget = reference?.resolveToDescriptors()?.firstOrNull() as? ValueParameterDescriptor?
+            val simpleNameTarget = reference?.resolveToDescriptors(bindingContext)?.firstOrNull() as? ValueParameterDescriptor?
             if (simpleNameTarget == null || bindingContext.get(BindingContext.AUTO_CREATED_IT, simpleNameTarget) != true) {
                 return false
             }
