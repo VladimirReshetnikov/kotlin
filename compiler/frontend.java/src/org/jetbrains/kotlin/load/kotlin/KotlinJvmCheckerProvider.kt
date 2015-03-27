@@ -184,40 +184,40 @@ public class JavaNullabilityWarningsChecker : AdditionalTypeChecker {
         }
     }
 
-    override fun checkType(expression: JetExpression, expressionType: JetType, c: ResolutionContext<*>) {
+    override fun checkType(expression: JetExpression, expressionType: JetType, context: ResolutionContext<*>) {
         doCheckType(
                 expressionType,
-                c.expectedType,
-                DataFlowValueFactory.createDataFlowValue(expression, expressionType, c.trace.getBindingContext()),
-                c.dataFlowInfo
+                context.expectedType,
+                DataFlowValueFactory.createDataFlowValue(expression, expressionType, context),
+                context.dataFlowInfo
         ) {
             expectedMustNotBeNull,
             actualMayBeNull ->
-            c.trace.report(ErrorsJvm.NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS.on(expression, expectedMustNotBeNull, actualMayBeNull))
+            context.trace.report(ErrorsJvm.NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS.on(expression, expectedMustNotBeNull, actualMayBeNull))
         }
 
         when (expression) {
             is JetPostfixExpression ->
                     if (expression.getOperationToken() == JetTokens.EXCLEXCL) {
                         val baseExpression = expression.getBaseExpression()
-                        val baseExpressionType = c.trace.get(BindingContext.EXPRESSION_TYPE, baseExpression) ?: return
+                        val baseExpressionType = context.trace.get(BindingContext.EXPRESSION_TYPE, baseExpression) ?: return
                         doIfNotNull(
-                                DataFlowValueFactory.createDataFlowValue(baseExpression, baseExpressionType, c.trace.getBindingContext()),
-                                c
+                                DataFlowValueFactory.createDataFlowValue(baseExpression, baseExpressionType, context),
+                                context
                         ) {
-                            c.trace.report(Errors.UNNECESSARY_NOT_NULL_ASSERTION.on(expression.getOperationReference(), baseExpressionType))
+                            context.trace.report(Errors.UNNECESSARY_NOT_NULL_ASSERTION.on(expression.getOperationReference(), baseExpressionType))
                         }
                     }
             is JetBinaryExpression ->
                 when (expression.getOperationToken()) {
                     JetTokens.ELVIS -> {
                         val baseExpression = expression.getLeft()
-                        val baseExpressionType = c.trace.get(BindingContext.EXPRESSION_TYPE, baseExpression) ?: return
+                        val baseExpressionType = context.trace.get(BindingContext.EXPRESSION_TYPE, baseExpression) ?: return
                         doIfNotNull(
-                                DataFlowValueFactory.createDataFlowValue(baseExpression, baseExpressionType, c.trace.getBindingContext()),
-                                c
+                                DataFlowValueFactory.createDataFlowValue(baseExpression, baseExpressionType, context),
+                                context
                         ) {
-                            c.trace.report(Errors.USELESS_ELVIS.on(expression.getOperationReference(), baseExpressionType))
+                            context.trace.report(Errors.USELESS_ELVIS.on(expression.getOperationReference(), baseExpressionType))
                         }
                     }
                     JetTokens.EQEQ,
@@ -226,11 +226,11 @@ public class JavaNullabilityWarningsChecker : AdditionalTypeChecker {
                     JetTokens.EXCLEQEQEQ -> {
                         if (expression.getLeft() != null && expression.getRight() != null) {
                             SenselessComparisonChecker.checkSenselessComparisonWithNull(
-                                    expression, expression.getLeft()!!, expression.getRight()!!, c.trace,
-                                    { c.trace.get(BindingContext.EXPRESSION_TYPE, it) },
+                                    expression, expression.getLeft()!!, expression.getRight()!!, context,
+                                    { context.trace.get(BindingContext.EXPRESSION_TYPE, it) },
                                     {
                                         value ->
-                                        doIfNotNull(value, c) { Nullability.NOT_NULL } ?: Nullability.UNKNOWN
+                                        doIfNotNull(value, context) { Nullability.NOT_NULL } ?: Nullability.UNKNOWN
                                     }
                             )
                         }
@@ -251,15 +251,15 @@ public class JavaNullabilityWarningsChecker : AdditionalTypeChecker {
             receiverParameter: ReceiverParameterDescriptor,
             receiverArgument: ReceiverValue,
             safeAccess: Boolean,
-            c: CallResolutionContext<*>
+            context: CallResolutionContext<*>
     ) {
-        val dataFlowValue = DataFlowValueFactory.createDataFlowValue(receiverArgument, c.trace.getBindingContext())
+        val dataFlowValue = DataFlowValueFactory.createDataFlowValue(receiverArgument, context)
         if (!safeAccess) {
             doCheckType(
                     receiverArgument.getType(),
                     receiverParameter.getType(),
                     dataFlowValue,
-                    c.dataFlowInfo
+                    context.dataFlowInfo
             ) {
                 expectedMustNotBeNull,
                 actualMayBeNull ->
@@ -267,17 +267,17 @@ public class JavaNullabilityWarningsChecker : AdditionalTypeChecker {
                         if (receiverArgument is ExpressionReceiver)
                             receiverArgument.getExpression()
                         else
-                            c.call.getCalleeExpression() ?: c.call.getCallElement()
+                            context.call.getCalleeExpression() ?: context.call.getCallElement()
 
-                c.trace.report(ErrorsJvm.NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS.on(
+                context.trace.report(ErrorsJvm.NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS.on(
                         reportOn, expectedMustNotBeNull, actualMayBeNull
                 ))
 
             }
         }
         else {
-            doIfNotNull(dataFlowValue, c) {
-                c.trace.report(Errors.UNNECESSARY_SAFE_CALL.on(c.call.getCallOperationNode().getPsi(), receiverArgument.getType()))
+            doIfNotNull(dataFlowValue, context) {
+                context.trace.report(Errors.UNNECESSARY_SAFE_CALL.on(context.call.getCallOperationNode().getPsi(), receiverArgument.getType()))
             }
         }
     }

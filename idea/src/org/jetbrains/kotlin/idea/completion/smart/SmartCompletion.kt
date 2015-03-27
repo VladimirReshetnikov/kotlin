@@ -48,6 +48,7 @@ trait InheritanceItemsSearcher {
 
 class SmartCompletion(
         val expression: JetExpression,
+        val containingDeclaration: DeclarationDescriptor,
         val resolutionFacade: ResolutionFacade,
         val moduleDescriptor: ModuleDescriptor,
         val bindingContext: BindingContext,
@@ -131,7 +132,8 @@ class SmartCompletion(
         else
             filteredExpectedInfos
 
-        val smartCastTypes: (VariableDescriptor) -> Collection<JetType> = SmartCastCalculator(bindingContext).calculate(expressionWithType, receiver)
+        val smartCastTypes: (VariableDescriptor) -> Collection<JetType> = SmartCastCalculator(
+                bindingContext, containingDeclaration).calculate(expressionWithType, receiver)
 
         val itemsToSkip = calcItemsToSkip(expressionWithType)
 
@@ -419,7 +421,8 @@ class SmartCompletion(
             tail: Tail?,
             typeFilter: (FuzzyType) -> Boolean
     ): Result {
-        val smartCastTypes: (VariableDescriptor) -> Collection<JetType> = SmartCastCalculator(bindingContext).calculate(position, receiver)
+        val smartCastTypes: (VariableDescriptor) -> Collection<JetType> = SmartCastCalculator(
+                bindingContext, containingDeclaration).calculate(position, receiver)
 
         fun filterDeclaration(descriptor: DeclarationDescriptor): Collection<LookupElement> {
             val types = descriptor.fuzzyTypes(smartCastTypes)

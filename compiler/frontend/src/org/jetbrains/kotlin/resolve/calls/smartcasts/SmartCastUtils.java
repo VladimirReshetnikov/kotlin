@@ -22,6 +22,7 @@ import kotlin.Function1;
 import kotlin.KotlinPackage;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor;
 import org.jetbrains.kotlin.descriptors.ReceiverParameterDescriptor;
 import org.jetbrains.kotlin.psi.JetExpression;
 import org.jetbrains.kotlin.resolve.BindingContext;
@@ -51,30 +52,34 @@ public class SmartCastUtils {
     @NotNull
     public static List<JetType> getSmartCastVariants(
             @NotNull ReceiverValue receiverToCast,
-            @NotNull ResolutionContext context
+            @NotNull ResolutionContext resolutionContext
     ) {
-        return getSmartCastVariants(receiverToCast, context.trace.getBindingContext(), context.dataFlowInfo);
+        return getSmartCastVariants(receiverToCast, resolutionContext.trace.getBindingContext(),
+                                    resolutionContext.scope.getContainingDeclaration(), resolutionContext.dataFlowInfo);
     }
 
     @NotNull
     public static List<JetType> getSmartCastVariants(
             @NotNull ReceiverValue receiverToCast,
-            @NotNull BindingContext bindingContext,
+            @NotNull BindingContext context,
+            @NotNull DeclarationDescriptor containingDeclaration,
             @NotNull DataFlowInfo dataFlowInfo
     ) {
         List<JetType> variants = Lists.newArrayList();
         variants.add(receiverToCast.getType());
-        variants.addAll(getSmartCastVariantsExcludingReceiver(bindingContext, dataFlowInfo, receiverToCast));
+        variants.addAll(getSmartCastVariantsExcludingReceiver(context, containingDeclaration, dataFlowInfo, receiverToCast));
         return variants;
     }
 
     @NotNull
     public static List<JetType> getSmartCastVariantsWithLessSpecificExcluded(
             @NotNull ReceiverValue receiverToCast,
-            @NotNull BindingContext bindingContext,
+            @NotNull BindingContext context,
+            @NotNull DeclarationDescriptor containingDeclaration,
             @NotNull DataFlowInfo dataFlowInfo
     ) {
-        final List<JetType> variants = getSmartCastVariants(receiverToCast, bindingContext, dataFlowInfo);
+        final List<JetType> variants = getSmartCastVariants(receiverToCast, context,
+                                                            containingDeclaration, dataFlowInfo);
         return KotlinPackage.filter(variants, new Function1<JetType, Boolean>() {
             @Override
             public Boolean invoke(final JetType type) {
@@ -93,7 +98,8 @@ public class SmartCastUtils {
      */
     @NotNull
     public static Collection<JetType> getSmartCastVariantsExcludingReceiver(
-            @NotNull BindingContext bindingContext,
+            @NotNull BindingContext context,
+            @NotNull DeclarationDescriptor containingDeclaration,
             @NotNull DataFlowInfo dataFlowInfo,
             @NotNull ReceiverValue receiverToCast
     ) {
@@ -104,7 +110,8 @@ public class SmartCastUtils {
             return dataFlowInfo.getPossibleTypes(dataFlowValue);
         }
         else if (receiverToCast instanceof ExpressionReceiver) {
-            DataFlowValue dataFlowValue = DataFlowValueFactory.createDataFlowValue(receiverToCast, bindingContext);
+            DataFlowValue dataFlowValue = DataFlowValueFactory.createDataFlowValue(
+                    receiverToCast, context, containingDeclaration);
             return dataFlowInfo.getPossibleTypes(dataFlowValue);
         }
         return Collections.emptyList();
@@ -153,12 +160,13 @@ public class SmartCastUtils {
         }
 
         Collection<JetType> smartCastTypesExcludingReceiver = getSmartCastVariantsExcludingReceiver(
-                context.trace.getBindingContext(), context.dataFlowInfo, receiver);
+                context.trace.getBindingContext(), context.scope.getContainingDeclaration(), context.dataFlowInfo, receiver);
         JetType smartCastSubType = getSmartCastSubType(receiverParameterType, smartCastTypesExcludingReceiver);
         if (smartCastSubType == null) return false;
 
         JetExpression expression = ((ExpressionReceiver) receiver).getExpression();
-        DataFlowValue dataFlowValue = DataFlowValueFactory.createDataFlowValue(receiver, context.trace.getBindingContext());
+        DataFlowValue dataFlowValue = DataFlowValueFactory.createDataFlowValue(receiver, context.trace.getBindingContext(),
+                                                                               context.scope.getContainingDeclaration());
 
         recordCastOrError(expression, smartCastSubType, context.trace, dataFlowValue.isStableIdentifier(), true);
         return true;
@@ -187,12 +195,13 @@ public class SmartCastUtils {
     public static boolean canBeSmartCast(
             @NotNull ReceiverParameterDescriptor receiverParameter,
             @NotNull ReceiverValue receiver,
-            @NotNull BindingContext bindingContext,
+            @NotNull BindingContext context,
+            @NotNull DeclarationDescriptor containingDeclaration,
             @NotNull DataFlowInfo dataFlowInfo
     ) {
         if (!receiver.getType().isMarkedNullable()) return true;
 
-        List<JetType> smartCastVariants = getSmartCastVariants(receiver, bindingContext, dataFlowInfo);
+        List<JetType> smartCastVariants = getSmartCastVariants(receiver, context, containingDeclaration, dataFlowInfo);
         for (JetType smartCastVariant : smartCastVariants) {
             if (JetTypeChecker.DEFAULT.isSubtypeOf(smartCastVariant, receiverParameter.getType())) return true;
         }

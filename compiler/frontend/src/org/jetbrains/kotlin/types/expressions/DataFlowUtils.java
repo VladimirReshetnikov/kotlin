@@ -22,6 +22,7 @@ import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns;
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor;
 import org.jetbrains.kotlin.lexer.JetTokens;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.resolve.BindingContext;
@@ -53,7 +54,11 @@ public class DataFlowUtils {
     }
 
     @NotNull
-    public static DataFlowInfo extractDataFlowInfoFromCondition(@Nullable JetExpression condition, final boolean conditionValue, final ExpressionTypingContext context) {
+    public static DataFlowInfo extractDataFlowInfoFromCondition(
+            @Nullable JetExpression condition,
+            final boolean conditionValue,
+            final ExpressionTypingContext context
+    ) {
         if (condition == null) return context.dataFlowInfo;
         final Ref<DataFlowInfo> result = new Ref<DataFlowInfo>(null);
         condition.accept(new JetVisitorVoid() {
@@ -93,9 +98,8 @@ public class DataFlowUtils {
                     JetType rhsType = context.trace.getBindingContext().get(BindingContext.EXPRESSION_TYPE, right);
                     if (rhsType == null) return;
 
-                    BindingContext bindingContext = context.trace.getBindingContext();
-                    DataFlowValue leftValue = DataFlowValueFactory.createDataFlowValue(left, lhsType, bindingContext);
-                    DataFlowValue rightValue = DataFlowValueFactory.createDataFlowValue(right, rhsType, bindingContext);
+                    DataFlowValue leftValue = DataFlowValueFactory.createDataFlowValue(left, lhsType, context);
+                    DataFlowValue rightValue = DataFlowValueFactory.createDataFlowValue(right, rhsType, context);
 
                     Boolean equals = null;
                     if (operationToken == JetTokens.EQEQ || operationToken == JetTokens.EQEQEQ) {
@@ -164,43 +168,43 @@ public class DataFlowUtils {
     public static JetType checkType(
             @Nullable JetType expressionType,
             @NotNull JetExpression expressionToCheck,
-            @NotNull ResolutionContext c,
+            @NotNull ResolutionContext context,
             @Nullable Ref<Boolean> hasError
     ) {
         if (hasError != null) hasError.set(false);
 
         JetExpression expression = JetPsiUtil.safeDeparenthesize(expressionToCheck, false);
-        recordExpectedType(c.trace, expression, c.expectedType);
+        recordExpectedType(context.trace, expression, context.expectedType);
 
         if (expressionType == null) return null;
 
-        c.additionalTypeChecker.checkType(expression, expressionType, c);
+        context.additionalTypeChecker.checkType(expression, expressionType, context);
 
-        if (noExpectedType(c.expectedType) || !c.expectedType.getConstructor().isDenotable() ||
-            JetTypeChecker.DEFAULT.isSubtypeOf(expressionType, c.expectedType)) {
+        if (noExpectedType(context.expectedType) || !context.expectedType.getConstructor().isDenotable() ||
+            JetTypeChecker.DEFAULT.isSubtypeOf(expressionType, context.expectedType)) {
             return expressionType;
         }
 
         if (expression instanceof JetConstantExpression) {
-            CompileTimeConstant<?> value = ConstantExpressionEvaluator.evaluate(expression, c.trace, c.expectedType);
+            CompileTimeConstant<?> value = ConstantExpressionEvaluator.evaluate(expression, context.trace, context.expectedType);
             if (value instanceof IntegerValueTypeConstant) {
-                value = EvaluatePackage.createCompileTimeConstantWithType((IntegerValueTypeConstant) value, c.expectedType);
+                value = EvaluatePackage.createCompileTimeConstantWithType((IntegerValueTypeConstant) value, context.expectedType);
             }
-            boolean error = new CompileTimeConstantChecker(c.trace, true)
-                    .checkConstantExpressionType(value, (JetConstantExpression) expression, c.expectedType);
+            boolean error = new CompileTimeConstantChecker(context.trace, true)
+                    .checkConstantExpressionType(value, (JetConstantExpression) expression, context.expectedType);
             if (hasError != null) hasError.set(error);
             return expressionType;
         }
 
-        DataFlowValue dataFlowValue = DataFlowValueFactory.createDataFlowValue(expression, expressionType, c.trace.getBindingContext());
+        DataFlowValue dataFlowValue = DataFlowValueFactory.createDataFlowValue(expression, expressionType, context);
 
-        for (JetType possibleType : c.dataFlowInfo.getPossibleTypes(dataFlowValue)) {
-            if (JetTypeChecker.DEFAULT.isSubtypeOf(possibleType, c.expectedType)) {
-                SmartCastUtils.recordCastOrError(expression, possibleType, c.trace, dataFlowValue.isStableIdentifier(), false);
+        for (JetType possibleType : context.dataFlowInfo.getPossibleTypes(dataFlowValue)) {
+            if (JetTypeChecker.DEFAULT.isSubtypeOf(possibleType, context.expectedType)) {
+                SmartCastUtils.recordCastOrError(expression, possibleType, context.trace, dataFlowValue.isStableIdentifier(), false);
                 return possibleType;
             }
         }
-        c.trace.report(TYPE_MISMATCH.on(expression, c.expectedType, expressionType));
+        context.trace.report(TYPE_MISMATCH.on(expression, context.expectedType, expressionType));
         if (hasError != null) hasError.set(true);
         return expressionType;
     }
@@ -254,9 +258,9 @@ public class DataFlowUtils {
             @NotNull JetExpression expression,
             @NotNull DataFlowInfo dataFlowInfo,
             @NotNull JetType type,
-            @NotNull BindingContext bindingContext
+            @NotNull ResolutionContext resolutionContext
     ) {
-        DataFlowValue dataFlowValue = DataFlowValueFactory.createDataFlowValue(expression, type, bindingContext);
+        DataFlowValue dataFlowValue = DataFlowValueFactory.createDataFlowValue(expression, type, resolutionContext);
         Collection<JetType> possibleTypes = Sets.newHashSet(type);
         if (dataFlowValue.isStableIdentifier()) {
             possibleTypes.addAll(dataFlowInfo.getPossibleTypes(dataFlowValue));

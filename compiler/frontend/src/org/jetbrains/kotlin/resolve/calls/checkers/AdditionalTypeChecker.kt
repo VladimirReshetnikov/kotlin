@@ -44,11 +44,11 @@ public trait AdditionalTypeChecker {
         }
     }
 
-    fun checkType(expression: JetExpression, expressionType: JetType, c: ResolutionContext<*>)
+    fun checkType(expression: JetExpression, expressionType: JetType, context: ResolutionContext<*>)
     fun checkReceiver(
             receiverParameter: ReceiverParameterDescriptor, 
             receiverArgument: ReceiverValue, 
             safeAccess: Boolean,
-            c: CallResolutionContext<*>
+            context: CallResolutionContext<*>
     )
 }

@@ -31,25 +31,24 @@ import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue
 import org.jetbrains.kotlin.resolve.calls.context.CallResolutionContext
 
 public class TypeApproximator : AdditionalTypeChecker {
-    override fun checkType(expression: JetExpression, expressionType: JetType, c: ResolutionContext<*>) {
-        if (noExpectedType(c.expectedType)) return
+    override fun checkType(expression: JetExpression, expressionType: JetType, context: ResolutionContext<*>) {
+        if (noExpectedType(context.expectedType)) return
 
         val approximationInfo = expressionType.getApproximationTo(
-                c.expectedType,
+                context.expectedType,
                 object : Approximation.DataFlowExtras {
                     override val canBeNull: Boolean
-                        get() = c.dataFlowInfo.getNullability(dataFlowValue).canBeNull()
+                        get() = context.dataFlowInfo.getNullability(dataFlowValue).canBeNull()
                     override val possibleTypes: Set<JetType>
-                        get() = c.dataFlowInfo.getPossibleTypes(dataFlowValue)
+                        get() = context.dataFlowInfo.getPossibleTypes(dataFlowValue)
                     override val presentableText: String
                         get() = StringUtil.trimMiddle(expression.getText(), 50)
 
-                    private val dataFlowValue =
-                        DataFlowValueFactory.createDataFlowValue(expression, expressionType, c.trace.getBindingContext())
+                    private val dataFlowValue = DataFlowValueFactory.createDataFlowValue(expression, expressionType, context)
                 }
         )
         if (approximationInfo != null) {
-            c.trace.record(BindingContext.EXPRESSION_RESULT_APPROXIMATION, expression, approximationInfo)
+            context.trace.record(BindingContext.EXPRESSION_RESULT_APPROXIMATION, expression, approximationInfo)
         }
     }
 
@@ -57,6 +56,6 @@ public class TypeApproximator : AdditionalTypeChecker {
             receiverParameter: ReceiverParameterDescriptor,
             receiverArgument: ReceiverValue,
             safeAccess: Boolean,
-            c: CallResolutionContext<*>
+            context: CallResolutionContext<*>
     ) { }
 }

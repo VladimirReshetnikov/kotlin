@@ -50,6 +50,7 @@ import org.jetbrains.kotlin.resolve.calls.smartcasts.SmartCastUtils
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindExclude
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
+import org.jetbrains.kotlin.resolve.scopes.JetScope
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import kotlin.properties.Delegates
 
@@ -71,6 +72,7 @@ abstract class CompletionSessionBase(protected val configuration: CompletionSess
 
     protected val reference: JetSimpleNameReference?
     protected val expression: JetExpression?
+    protected val jetScope: JetScope = resolutionFacade.getFileTopLevelScope(file)
 
     ;{
         val reference = position.getParent()?.getReferences()?.firstIsInstanceOrNull<JetSimpleNameReference>()
@@ -137,7 +139,7 @@ abstract class CompletionSessionBase(protected val configuration: CompletionSess
             val (receivers, callType) = referenceVariantsHelper!!.getReferenceVariantsReceivers(expression)
             val dataFlowInfo = bindingContext!!.getDataFlowInfo(expression)
             var receiverTypes = receivers.flatMap {
-                SmartCastUtils.getSmartCastVariantsWithLessSpecificExcluded(it, bindingContext, dataFlowInfo)
+                SmartCastUtils.getSmartCastVariantsWithLessSpecificExcluded(it, bindingContext, jetScope.getContainingDeclaration(), dataFlowInfo)
             }
             if (callType == CallType.SAFE) {
                 receiverTypes = receiverTypes.map { it.makeNotNullable() }
@@ -396,7 +398,7 @@ class SmartCompletionSession(configuration: CompletionSessionConfiguration, para
     override fun doComplete() {
         if (expression != null) {
             val mapper = ToFromOriginalFileMapper(parameters.getOriginalFile() as JetFile, position.getContainingFile() as JetFile, parameters.getOffset())
-            val completion = SmartCompletion(expression, resolutionFacade, moduleDescriptor,
+            val completion = SmartCompletion(expression, jetScope.getContainingDeclaration(), resolutionFacade, moduleDescriptor,
                                              bindingContext!!, { isVisibleDescriptor(it) }, inDescriptor, prefixMatcher, originalSearchScope,
                                              mapper, lookupElementFactory)
             val result = completion.execute()
