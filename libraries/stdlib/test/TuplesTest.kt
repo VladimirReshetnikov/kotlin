@@ -50,6 +50,12 @@ class PairTest {
         assertEquals(listOf(1, null), (1 to null).toList())
         assertEquals(listOf(1, "2"), (1 to "2").toList())
     }
+
+    test fun pairSwap() {
+        val s = p.swap()
+        assertEquals(p.second, s.first)
+        assertEquals(p.first, s.second)
+    }
 }
 
 class TripleTest {

@@ -34,6 +34,11 @@ public data class Pair<out A, out B>(
 public fun <T> Pair<T, T>.toList(): List<T> = listOf(first, second)
 
 /**
+ * Returns a pair having the components of this pair swapped.
+ */
+public fun <T1, T2> Pair<T1, T2>.swap(): Pair<T2, T1> = Pair(second, first)
+
+/**
  * Represents a triad of values
  *
  * There is no meaning attached to values in this class, it can be used for any purpose.
