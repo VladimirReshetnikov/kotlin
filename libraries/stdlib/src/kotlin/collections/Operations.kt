@@ -40,3 +40,17 @@ public fun <T> Array<Array<out T>>.flatten(): List<T> {
     return result
 }
 
+/**
+ * Returns a list of non-empty strings from this collection.
+ */
+public fun Iterable<String>.dropEmpty(): List<String> = filterNot { it.isEmpty() }
+
+/**
+ * Returns a list of non-empty strings from this array.
+ */
+public fun Array<String>.dropEmpty(): List<String> = filterNot { it.isEmpty() }
+
+/**
+ * Returns a sequence of non-empty strings from this sequence.
+ */
+public fun Sequence<String>.dropEmpty(): Sequence<String> = filterNot { it.isEmpty() }
