@@ -1897,9 +1897,21 @@ public class JetExtractionTestGenerated extends AbstractJetExtractionTest {
                     doExtractFunctionTest(fileName);
                 }
 
+                @TestMetadata("anonymousObjectWithCall.kt")
+                public void testAnonymousObjectWithCall() throws Exception {
+                    String fileName = JetTestUtils.navigationMetadata("idea/testData/refactoring/extractFunction/parameters/nonDenotableTypes/anonymousObjectWithCall.kt");
+                    doExtractFunctionTest(fileName);
+                }
+
                 @TestMetadata("localClass.kt")
                 public void testLocalClass() throws Exception {
                     String fileName = JetTestUtils.navigationMetadata("idea/testData/refactoring/extractFunction/parameters/nonDenotableTypes/localClass.kt");
+                    doExtractFunctionTest(fileName);
+                }
+
+                @TestMetadata("localClassWithSuperclass.kt")
+                public void testLocalClassWithSuperclass() throws Exception {
+                    String fileName = JetTestUtils.navigationMetadata("idea/testData/refactoring/extractFunction/parameters/nonDenotableTypes/localClassWithSuperclass.kt");
                     doExtractFunctionTest(fileName);
                 }
             }
