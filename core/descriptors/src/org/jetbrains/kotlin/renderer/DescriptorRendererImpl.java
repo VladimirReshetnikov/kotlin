@@ -538,13 +538,35 @@ public class DescriptorRendererImpl implements DescriptorRenderer {
     }
 
     private void renderAnnotations(@NotNull Annotated annotated, @NotNull StringBuilder builder) {
+        renderAnnotations(annotated, builder, false, false);
+    }
+
+    private void renderAnnotations(
+            @NotNull Annotated annotated,
+            @NotNull StringBuilder builder,
+            boolean needBrackets,
+            boolean needWhitespaceBefore) {
         if (!modifiers.contains(Modifier.ANNOTATIONS)) return;
         for (AnnotationDescriptor annotation : annotated.getAnnotations()) {
             ClassDescriptor annotationClass = (ClassDescriptor) annotation.getType().getConstructor().getDeclarationDescriptor();
             assert annotationClass != null;
 
             if (!excludedAnnotationClasses.contains(DescriptorUtils.getFqNameSafe(annotationClass))) {
-                builder.append(renderAnnotation(annotation)).append(" ");
+                if (needWhitespaceBefore) {
+                    builder.append(' ');
+                }
+                if (needBrackets) {
+                    builder.append('[');
+                }
+
+                builder.append(renderAnnotation(annotation));
+
+                if (needBrackets) {
+                    builder.append(']');
+                }
+                if (!needWhitespaceBefore) {
+                    builder.append(' ');
+                }
             }
         }
     }
@@ -610,12 +632,24 @@ public class DescriptorRendererImpl implements DescriptorRenderer {
     }
 
     private void renderVisibility(@NotNull Visibility visibility, @NotNull StringBuilder builder) {
-        if (!modifiers.contains(Modifier.VISIBILITY)) return;
+        if (renderVisibilityWithoutWhitespace(visibility, builder)) {
+            builder.append(" ");
+        }
+    }
+
+    private boolean renderVisibilityWithoutWhitespace(
+            @NotNull Visibility visibility,
+            @NotNull StringBuilder builder
+    ) {
+        if (!modifiers.contains(Modifier.VISIBILITY)) return false;
         if (normalizedVisibilities) {
             visibility = visibility.normalize();
         }
-        if (!showInternalKeyword && visibility == Visibilities.INTERNAL) return;
-        builder.append(renderKeyword(visibility.toString())).append(" ");
+
+        if (!showInternalKeyword && visibility == Visibilities.INTERNAL) return false;
+        builder.append(renderKeyword(visibility.toString()));
+
+        return true;
     }
 
     private void renderModality(@NotNull Modality modality, @NotNull StringBuilder builder) {
@@ -972,6 +1006,9 @@ public class DescriptorRendererImpl implements DescriptorRenderer {
         if (!klass.getKind().isSingleton() && classWithPrimaryConstructor) {
             ConstructorDescriptor primaryConstructor = klass.getUnsubstitutedPrimaryConstructor();
             if (primaryConstructor != null) {
+                builder.append(" ");
+                renderVisibilityWithoutWhitespace(primaryConstructor.getVisibility(), builder);
+                renderAnnotations(primaryConstructor, builder, true, true);
                 renderValueParameters(primaryConstructor, builder);
             }
         }

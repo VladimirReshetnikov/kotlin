@@ -25,10 +25,7 @@ import org.jetbrains.kotlin.lexer.JetTokens
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.psi.JetConstructorCalleeExpression
-import org.jetbrains.kotlin.psi.JetDotQualifiedExpression
-import org.jetbrains.kotlin.psi.JetPackageDirective
-import org.jetbrains.kotlin.psi.JetTypeReference
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.stubs.KotlinUserTypeStub
 import org.jetbrains.kotlin.psi.stubs.elements.JetStubElementTypes
 import org.jetbrains.kotlin.psi.stubs.impl.*
@@ -171,10 +168,17 @@ fun createModifierListStub(
     )
 }
 
-fun createAnnotationStubs(annotationIds: List<ClassId>, modifierList: KotlinModifierListStubImpl) = annotationIds.forEach {
+fun createAnnotationStubs(
+        annotationIds: List<ClassId>,
+        modifierList: KotlinModifierListStubImpl,
+        needWrappingAnnotationEntries: Boolean = false) = annotationIds.forEach {
     annotationClassId ->
+    val entryParent =
+            if (needWrappingAnnotationEntries) KotlinPlaceHolderStubImpl<JetAnnotation>(modifierList, JetStubElementTypes.ANNOTATION)
+            else modifierList
+
     val annotationEntryStubImpl = KotlinAnnotationEntryStubImpl(
-            modifierList,
+            entryParent,
             shortName = annotationClassId.getShortClassName().ref(),
             hasValueArguments = false
     )

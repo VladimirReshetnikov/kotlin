@@ -25,10 +25,7 @@ import org.jetbrains.kotlin.idea.decompiler.stubBuilder.FlagsToModifiers.VISIBIL
 import org.jetbrains.kotlin.lexer.JetModifierKeywordToken
 import org.jetbrains.kotlin.lexer.JetTokens
 import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.psi.JetClassBody
-import org.jetbrains.kotlin.psi.JetDelegationSpecifierList
-import org.jetbrains.kotlin.psi.JetDelegatorToSuperClass
-import org.jetbrains.kotlin.psi.JetParameterList
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.stubs.elements.JetClassElementType
 import org.jetbrains.kotlin.psi.stubs.elements.JetStubElementTypes
 import org.jetbrains.kotlin.psi.stubs.impl.KotlinClassStubImpl
@@ -142,11 +139,11 @@ private class ClassClsStubBuilder(
 
         val primaryConstructorProto = classProto.getPrimaryConstructor()
         if (primaryConstructorProto.hasData()) {
-            typeStubBuilder.createValueParameterListStub(classOrObjectStub, primaryConstructorProto.getData(), ProtoContainer(classProto, null))
+            createCallableStub(classOrObjectStub, primaryConstructorProto.getData(), c, ProtoContainer(classProto, null))
         }
         else {
             //default empty constructor
-            KotlinPlaceHolderStubImpl<JetParameterList>(classOrObjectStub, JetStubElementTypes.VALUE_PARAMETER_LIST)
+            KotlinPlaceHolderStubImpl<JetPrimaryConstructor>(classOrObjectStub, JetStubElementTypes.PRIMARY_CONSTRUCTOR)
         }
     }
 

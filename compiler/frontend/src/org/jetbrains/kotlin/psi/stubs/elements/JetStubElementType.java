@@ -28,10 +28,7 @@ import com.intellij.util.ReflectionUtil;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.idea.JetLanguage;
-import org.jetbrains.kotlin.psi.JetClassOrObject;
-import org.jetbrains.kotlin.psi.JetElementImplStub;
-import org.jetbrains.kotlin.psi.JetFunction;
-import org.jetbrains.kotlin.psi.JetProperty;
+import org.jetbrains.kotlin.psi.*;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
@@ -92,6 +89,9 @@ public abstract class JetStubElementType<StubT extends StubElement, PsiT extends
     public boolean shouldCreateStub(ASTNode node) {
         PsiElement psi = node.getPsi();
         if (psi instanceof JetClassOrObject) {
+            return true;
+        }
+        if (psi instanceof JetPrimaryConstructor) {
             return true;
         }
         if (psi instanceof JetFunction) {

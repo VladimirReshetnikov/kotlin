@@ -20,8 +20,10 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.stubs.StubElement
 import org.jetbrains.kotlin.idea.decompiler.stubBuilder.FlagsToModifiers.MODALITY
 import org.jetbrains.kotlin.idea.decompiler.stubBuilder.FlagsToModifiers.VISIBILITY
+import org.jetbrains.kotlin.lexer.JetTokens
 import org.jetbrains.kotlin.psi.JetSecondaryConstructor
 import org.jetbrains.kotlin.psi.stubs.elements.JetStubElementTypes
+import org.jetbrains.kotlin.psi.stubs.impl.KotlinClassStubImpl
 import org.jetbrains.kotlin.psi.stubs.impl.KotlinFunctionStubImpl
 import org.jetbrains.kotlin.psi.stubs.impl.KotlinPlaceHolderStubImpl
 import org.jetbrains.kotlin.psi.stubs.impl.KotlinPropertyStubImpl
@@ -66,6 +68,8 @@ private class CallableClsStubBuilder(
     private val isTopLevel: Boolean get() = protoContainer.packageFqName != null
     private val callableKind = Flags.CALLABLE_KIND[callableProto.getFlags()]
     private val isConstructor = callableKind == ProtoBuf.Callable.CallableKind.CONSTRUCTOR
+    private val isPrimaryConstructor = isConstructor && parent is KotlinClassStubImpl
+    private val needWrappingAnnotationEntries = isPrimaryConstructor
     private val callableStub = doCreateCallableStub()
 
     fun build() {
@@ -97,11 +101,12 @@ private class CallableClsStubBuilder(
         val isModalityIrrelevant = isTopLevel || isConstructor
         val relevantModifiers = if (isModalityIrrelevant) listOf(VISIBILITY) else listOf(VISIBILITY, MODALITY)
 
-        val modifierListStubImpl = createModifierListStubForDeclaration(callableStub, callableProto.getFlags(), relevantModifiers)
+        val modifierListStubImpl = createModifierListStubForDeclaration(
+                callableStub, callableProto.getFlags(), relevantModifiers)
         val annotationIds = c.components.annotationLoader.loadCallableAnnotations(
                 protoContainer, callableProto, c.nameResolver, callableProto.annotatedCallableKind
         )
-        createAnnotationStubs(annotationIds, modifierListStubImpl)
+        createAnnotationStubs(annotationIds, modifierListStubImpl, needWrappingAnnotationEntries)
     }
 
     private fun doCreateCallableStub(): StubElement<out PsiElement> {
@@ -137,7 +142,10 @@ private class CallableClsStubBuilder(
                 )
             }
             ProtoBuf.Callable.CallableKind.CONSTRUCTOR -> {
-                KotlinPlaceHolderStubImpl<JetSecondaryConstructor>(parent, JetStubElementTypes.SECONDARY_CONSTRUCTOR)
+                if (parent is KotlinClassStubImpl)
+                    KotlinPlaceHolderStubImpl(parent, JetStubElementTypes.PRIMARY_CONSTRUCTOR)
+                else
+                    KotlinPlaceHolderStubImpl(parent, JetStubElementTypes.SECONDARY_CONSTRUCTOR)
             }
             else -> throw IllegalStateException("Unknown callable kind $callableKind")
         }
