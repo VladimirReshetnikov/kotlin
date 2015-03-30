@@ -9,8 +9,6 @@ class A
     }
 }
 
-class B [Anon5(11)]
-()
+class B [Anon5(11)]()
 
-class C [Anon5(12)]
-private()
+class C [Anon5(12)] private()
