@@ -4900,6 +4900,12 @@ public class QuickFixTestGenerated extends AbstractQuickFixTest {
             doTest(fileName);
         }
 
+        @TestMetadata("beforeResolvableTypeParams.kt")
+        public void testResolvableTypeParams() throws Exception {
+            String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/typeMismatch/beforeResolvableTypeParams.kt");
+            doTest(fileName);
+        }
+
         @TestMetadata("beforeReturnTypeMismatch.kt")
         public void testReturnTypeMismatch() throws Exception {
             String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/typeMismatch/beforeReturnTypeMismatch.kt");
@@ -4909,6 +4915,12 @@ public class QuickFixTestGenerated extends AbstractQuickFixTest {
         @TestMetadata("beforeTooManyArgumentsException.kt")
         public void testTooManyArgumentsException() throws Exception {
             String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/typeMismatch/beforeTooManyArgumentsException.kt");
+            doTest(fileName);
+        }
+
+        @TestMetadata("beforeUnresolvableTypeParams.kt")
+        public void testUnresolvableTypeParams() throws Exception {
+            String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/typeMismatch/beforeUnresolvableTypeParams.kt");
             doTest(fileName);
         }
 
